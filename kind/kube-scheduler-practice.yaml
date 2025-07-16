@@ -1,0 +1,11 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: kube-scheduler-practice
+  namespace: kube-system
+spec:
+  serviceAccountName: my-custom-scheduler-sa
+  containers:
+  - name: kube-scheduler-practice
+    image: kube-scheduler-practice:latest
+    imagePullPolicy: IfNotPresent

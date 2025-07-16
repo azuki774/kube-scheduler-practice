@@ -1,6 +1,3 @@
-/*
-Copyright © 2025 NAME HERE <EMAIL ADDRESS>
-*/
 package cmd
 
 import (
@@ -21,12 +18,17 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		slog.Info("kube-scheduler-practice start")
 		c, err := client.NewInClusterClient()
 		if err != nil {
 			slog.Error(err.Error())
 			return
 		}
-		c.GetNodes()
+		err = c.GetNodes()
+		if err != nil {
+			slog.Error(err.Error())
+			return
+		}
 	},
 }
 

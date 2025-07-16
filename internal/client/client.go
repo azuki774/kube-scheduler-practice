@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
@@ -61,6 +62,6 @@ func (k *K8sClient) GetNodes() error {
 	for _, node := range nodes.Items {
 		slog.Info("node", "name", node.Name, "label.tier", node.Labels["tier"])
 	}
-
+	time.Sleep(180 * time.Second)
 	return nil
 }
