@@ -23,3 +23,7 @@ build:
 .PHONY: kind-load
 kind-load:
 	kind load docker-image $(IMAGE_NAME)
+
+.PHONY: test
+test:
+	go test -v ./...

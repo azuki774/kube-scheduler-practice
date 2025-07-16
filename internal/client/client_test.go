@@ -50,11 +50,21 @@ func TestK8sClient_GetPodsNotScheduled(t *testing.T) {
 			},
 			wantErr: false,
 		},
+		{
+			name: "none",
+			fields: fields{
+				K8sClient: K8sClient{Clientset: fake.NewSimpleClientset()},
+			},
+			want: &v1.PodList{
+				Items: []v1.Pod{},
+			},
+			wantErr: false,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			k := &K8sClient{
-				Clientset: fakeClientset,
+				Clientset: tt.fields.K8sClient.Clientset,
 			}
 			got, err := k.GetUnscheduledPods()
 			if (err != nil) != tt.wantErr {
