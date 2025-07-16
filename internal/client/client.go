@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"log/slog"
 	"path/filepath"
-	"time"
 
+	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
@@ -16,7 +16,7 @@ import (
 )
 
 type K8sClient struct {
-	Clientset *kubernetes.Clientset
+	Clientset kubernetes.Interface
 }
 
 func NewLocalClient() (K8sClient, error) {
@@ -62,6 +62,22 @@ func (k *K8sClient) GetNodes() error {
 	for _, node := range nodes.Items {
 		slog.Info("node", "name", node.Name, "label.tier", node.Labels["tier"])
 	}
-	time.Sleep(180 * time.Second)
 	return nil
+}
+
+func (k *K8sClient) GetUnscheduledPods() (*v1.PodList, error) {
+	// node にアサインされていない Pod の一覧を取得する
+	unscheduledPods := &v1.PodList{}
+	pods, err := k.Clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("error getting pods: %s", err.Error())
+	}
+	for _, pod := range pods.Items {
+		if pod.Spec.NodeName == "" {
+			unscheduledPods.Items = append(unscheduledPods.Items, pod)
+			slog.Info("detect unscheduled pods", "name", pod.Name, "namespace", pod.Namespace)
+		}
+	}
+
+	return unscheduledPods, nil
 }
