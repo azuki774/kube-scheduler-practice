@@ -1,15 +1,10 @@
 package cmd
 
 import (
-	"flag"
 	"kube-scheduler-practice/internal/client"
-	"log"
-	"path/filepath"
+	"log/slog"
 
 	"github.com/spf13/cobra"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/tools/clientcmd"
-	"k8s.io/client-go/util/homedir"
 )
 
 // localCmd represents the local command
@@ -23,25 +18,11 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		var kubeconfig *string
-		if home := homedir.HomeDir(); home != "" {
-			kubeconfig = flag.String("kubeconfig", filepath.Join(home, ".kube", "config"), "(optional) absolute path to the kubeconfig file")
-		} else {
-			kubeconfig = flag.String("kubeconfig", "", "absolute path to the kubeconfig file")
-		}
-		flag.Parse()
-
-		config, err := clientcmd.BuildConfigFromFlags("", *kubeconfig)
+		c, err := client.NewLocalClient()
 		if err != nil {
-			log.Fatalf("Error building kubeconfig: %s", err.Error())
+			slog.Error(err.Error())
+			return
 		}
-
-		clientset, err := kubernetes.NewForConfig(config)
-		if err != nil {
-			log.Fatalf("Error creating clientset: %s", err.Error())
-		}
-
-		c := client.K8sClient{Clientset: clientset}
 		c.GetNodes()
 	},
 }

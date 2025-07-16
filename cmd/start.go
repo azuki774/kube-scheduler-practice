@@ -5,11 +5,9 @@ package cmd
 
 import (
 	"kube-scheduler-practice/internal/client"
-	"log"
+	"log/slog"
 
 	"github.com/spf13/cobra"
-	"k8s.io/client-go/kubernetes"
-	"k8s.io/client-go/rest"
 )
 
 // startCmd represents the start command
@@ -23,17 +21,11 @@ Cobra is a CLI library for Go that empowers applications.
 This application is a tool to generate the needed files
 to quickly create a Cobra application.`,
 	Run: func(cmd *cobra.Command, args []string) {
-		config, err := rest.InClusterConfig()
+		c, err := client.NewInClusterClient()
 		if err != nil {
-			log.Fatalf("Error creating in-cluster config: %s", err.Error())
+			slog.Error(err.Error())
+			return
 		}
-
-		clientset, err := kubernetes.NewForConfig(config)
-		if err != nil {
-			log.Fatalf("Error creating clientset: %s", err.Error())
-		}
-
-		c := client.K8sClient{Clientset: clientset}
 		c.GetNodes()
 	},
 }
