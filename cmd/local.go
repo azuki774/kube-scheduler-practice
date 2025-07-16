@@ -49,7 +49,7 @@ to quickly create a Cobra application.`,
 		}
 
 		for _, node := range nodes.Items {
-			slog.Info("node", "name", node.Name)
+			slog.Info("node", "name", node.Name, "label.tier", node.Labels["tier"])
 		}
 	},
 }
