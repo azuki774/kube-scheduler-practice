@@ -1,11 +1,15 @@
 package client
 
 import (
+	"errors"
 	"testing"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/kubernetes/fake"
+	coretesting "k8s.io/client-go/testing"
 )
 
 func TestK8sClient_GetNodes(t *testing.T) {
@@ -37,7 +41,7 @@ func TestK8sClient_GetNodes(t *testing.T) {
 			},
 			wantErr: false,
 		},
-				{
+		{
 			name: "success: get one node",
 			fields: fields{
 				// node1が存在するFakeClientSetを準備
@@ -172,6 +176,86 @@ func TestK8sClient_GetPodsNotScheduled(t *testing.T) {
 				if _, ok := expectedPodNames[gotPod.Name]; !ok {
 					t.Errorf("Unexpected pod found in results: %s", gotPod.Name)
 				}
+			}
+		})
+	}
+}
+
+func TestK8sClient_AssignPodToNode(t *testing.T) {
+	type fields struct {
+		Clientset kubernetes.Interface
+	}
+	type args struct {
+		pod  *v1.Pod
+		node *v1.Node
+	}
+
+	// --- テストデータとシナリオの準備 ---
+	podToBind := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod", Namespace: "default"}}
+	nodeToBindTo := &v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "test-node"}}
+
+	// テストケースを定義
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "success: correctly bind pod to node",
+			fields: fields{
+				Clientset: func() *fake.Clientset {
+					clientset := fake.NewSimpleClientset()
+					clientset.PrependReactor("create", "pods", func(action coretesting.Action) (handled bool, ret runtime.Object, err error) {
+						createAction := action.(coretesting.CreateAction)
+						if createAction.GetSubresource() != "binding" {
+							return false, nil, nil // bindingでなければこのリアクターは処理しない
+						}
+
+						binding := createAction.GetObject().(*v1.Binding)
+						if binding.Name != podToBind.Name || binding.Target.Name != nodeToBindTo.Name {
+							t.Errorf("mismatched binding: got pod %s on node %s", binding.Name, binding.Target.Name)
+						}
+
+						// 成功したことを示す
+						return true, binding, nil
+					})
+					return clientset
+				}(),
+			},
+			args: args{
+				pod:  podToBind,
+				node: nodeToBindTo,
+			},
+			wantErr: false,
+		},
+		{
+			name: "failure: API server returns error",
+			fields: fields{
+				Clientset: func() *fake.Clientset {
+					clientset := fake.NewSimpleClientset()
+					// 常にエラーを返すリアクターを設定
+					clientset.PrependReactor("create", "pods", func(action coretesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("simulated API error")
+					})
+					return clientset
+				}(),
+			},
+			args: args{
+				pod:  podToBind,
+				node: nodeToBindTo,
+			},
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			k := &K8sClient{
+				Clientset: tt.fields.Clientset,
+			}
+			if err := k.AssignPodToNode(tt.args.pod, tt.args.node); (err != nil) != tt.wantErr {
+				t.Errorf("K8sClient.AssignPodToNode() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

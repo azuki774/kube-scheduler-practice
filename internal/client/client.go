@@ -16,7 +16,13 @@ import (
 )
 
 type K8sClient struct {
-	Clientset kubernetes.Interface
+	Clientset     kubernetes.Interface
+	ScheduleLogic ScheduleLogic
+}
+
+type ScheduleLogic interface {
+	ChooseAvailableNodes(unschedulePod *v1.Pod, vs *v1.NodeList) (*v1.NodeList, error)
+	ChooseSuitableNode(unschedulePod *v1.Pod, vs *v1.NodeList) (v1.Node, error)
 }
 
 func NewLocalClient() (K8sClient, error) {
@@ -78,4 +84,59 @@ func (k *K8sClient) GetUnscheduledPods() (*v1.PodList, error) {
 	}
 
 	return unscheduledPods, nil
+}
+
+func (k *K8sClient) AssignPodToNode(pod *v1.Pod, node *v1.Node) error {
+	binding := &v1.Binding{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      pod.Name,
+			Namespace: pod.Namespace,
+		},
+		Target: v1.ObjectReference{
+			APIVersion: "v1",
+			Kind:       "Node",
+			Name:       node.Name,
+		},
+	}
+
+	slog.Info("attempting to bind pod to node", "pod", pod.Name, "node", node.Name)
+
+	err := k.Clientset.CoreV1().Pods(pod.Namespace).Bind(context.TODO(), binding, metav1.CreateOptions{})
+	if err != nil {
+		slog.Error("failed to bind pod to node", "pod", pod.Name, "node", node.Name, "error", err)
+		return fmt.Errorf("failed to bind pod %s/%s to node %s: %w", pod.Namespace, pod.Name, node.Name, err)
+	}
+
+	slog.Info("successfully bound pod to node", "pod", pod.Name, "node", node.Name)
+	return nil
+}
+
+// スケジュールされていない pod 取得 → ノード情報取得 → 配置するpodを選択 → 配置指示
+// 一連の処理の一巡を行う
+func (k *K8sClient) ProcessOneLoop() error {
+	unscheduledPods, err := k.GetUnscheduledPods()
+	if err != nil {
+		return err
+	}
+	nodes, err := k.GetNodes()
+	if err != nil {
+		return err
+	}
+	for _, pod := range unscheduledPods.Items {
+		// 配置して良いノードを取得
+		availableNodes, err := k.ScheduleLogic.ChooseAvailableNodes(&pod, nodes)
+		if err != nil {
+			return err
+		}
+
+		selectNode, err := k.ScheduleLogic.ChooseSuitableNode(&pod, availableNodes)
+		if err != nil {
+			return err
+		}
+
+		if err := k.AssignPodToNode(&pod, &selectNode); err != nil {
+			return err
+		}
+	}
+	return nil
 }
