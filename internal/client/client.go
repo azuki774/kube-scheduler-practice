@@ -53,20 +53,18 @@ func NewInClusterClient() (K8sClient, error) {
 	return K8sClient{Clientset: clientset}, nil
 }
 
-func (k *K8sClient) GetNodes() error {
+func (k *K8sClient) GetNodes() (*v1.NodeList, error) {
 	nodes, err := k.Clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
-		return fmt.Errorf("error getting nodes: %s", err.Error())
+		return nil, fmt.Errorf("error getting nodes: %s", err.Error())
 	}
-
-	for _, node := range nodes.Items {
-		slog.Info("node", "name", node.Name, "label.tier", node.Labels["tier"])
-	}
-	return nil
+	return nodes, nil
 }
 
 func (k *K8sClient) GetUnscheduledPods() (*v1.PodList, error) {
 	// node にアサインされていない Pod の一覧を取得する
+
+	// TODO: この実装はFieldSelectorを使うことで効率化される
 	unscheduledPods := &v1.PodList{}
 	pods, err := k.Clientset.CoreV1().Pods("").List(context.TODO(), metav1.ListOptions{})
 	if err != nil {

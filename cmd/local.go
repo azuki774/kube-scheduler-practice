@@ -23,7 +23,7 @@ to quickly create a Cobra application.`,
 			slog.Error(err.Error())
 			return
 		}
-		err = c.GetNodes()
+		_, err = c.GetNodes()
 		if err != nil {
 			slog.Error(err.Error())
 			return
