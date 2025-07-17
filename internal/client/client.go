@@ -4,8 +4,10 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"kube-scheduler-practice/internal/logic"
 	"log/slog"
 	"path/filepath"
+	"time"
 
 	v1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,7 +45,9 @@ func NewLocalClient() (K8sClient, error) {
 	if err != nil {
 		return K8sClient{}, fmt.Errorf("error creating clientset: %s", err.Error())
 	}
-	return K8sClient{Clientset: clientset}, nil
+
+	scheduleLogic := &logic.ScheduleLogic{}
+	return K8sClient{Clientset: clientset, ScheduleLogic: scheduleLogic}, nil
 }
 
 func NewInClusterClient() (K8sClient, error) {
@@ -56,7 +60,9 @@ func NewInClusterClient() (K8sClient, error) {
 	if err != nil {
 		return K8sClient{}, fmt.Errorf("error creating clientset: %s", err.Error())
 	}
-	return K8sClient{Clientset: clientset}, nil
+
+	scheduleLogic := &logic.ScheduleLogic{}
+	return K8sClient{Clientset: clientset, ScheduleLogic: scheduleLogic}, nil
 }
 
 func (k *K8sClient) GetNodes() (*v1.NodeList, error) {
@@ -147,4 +153,13 @@ func (k *K8sClient) ProcessOneLoop() error {
 		}
 	}
 	return nil
+}
+
+func (k *K8sClient) Run() {
+	for {
+		if err := k.ProcessOneLoop(); err != nil {
+			slog.Error(err.Error())
+		}
+		time.Sleep(10 * time.Second)
+	}
 }
