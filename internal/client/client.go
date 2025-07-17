@@ -118,20 +118,28 @@ func (k *K8sClient) ProcessOneLoop() error {
 	if err != nil {
 		return err
 	}
-	nodes, err := k.GetNodes()
-	if err != nil {
-		return err
-	}
+
 	for _, pod := range unscheduledPods.Items {
+		nodes, err := k.GetNodes()
+		if err != nil {
+			return err
+		}
+
 		// 配置して良いノードを取得
 		availableNodes, err := k.ScheduleLogic.ChooseAvailableNodes(&pod, nodes)
 		if err != nil {
 			return err
 		}
-
+		// 実際に配置するノードを取得
 		selectNode, err := k.ScheduleLogic.ChooseSuitableNode(&pod, availableNodes)
 		if err != nil {
 			return err
+		}
+
+		// もし selectNode が空だったら、スケジューリングをスキップ
+		if selectNode.Name == "" {
+			slog.Info("no suitable node found for pod", "pod", pod.Name)
+			continue
 		}
 
 		if err := k.AssignPodToNode(&pod, &selectNode); err != nil {

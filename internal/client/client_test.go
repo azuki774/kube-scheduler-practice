@@ -260,3 +260,144 @@ func TestK8sClient_AssignPodToNode(t *testing.T) {
 		})
 	}
 }
+
+func TestK8sClient_ProcessOneLoop(t *testing.T) {
+	type fields struct {
+		Clientset     kubernetes.Interface
+		ScheduleLogic ScheduleLogic
+	}
+	// --- test cases ---
+	unscheduledPod1 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod-1", Namespace: "default"}}
+	unscheduledPod2 := &v1.Pod{ObjectMeta: metav1.ObjectMeta{Name: "test-pod-2", Namespace: "default"}}
+	availableNode := v1.Node{ObjectMeta: metav1.ObjectMeta{Name: "available-node"}}
+	tests := []struct {
+		name          string
+		fields        fields
+		wantErr       bool
+		podExists     bool // to check if a pod exists before the test
+		expectedError string
+	}{
+		{
+			name: "Success: schedule a pod to a node with one unscheduled pod",
+			fields: fields{
+				Clientset: fake.NewSimpleClientset(unscheduledPod1),
+				ScheduleLogic: &mockScheduleLogic{
+					funcChooseAvailableNodes: func(p *v1.Pod, nl *v1.NodeList) (*v1.NodeList, error) {
+						return &v1.NodeList{Items: []v1.Node{availableNode}}, nil
+					},
+					funcChooseSuitableNode: func(p *v1.Pod, nl *v1.NodeList) (v1.Node, error) {
+						return availableNode, nil
+					},
+				},
+			},
+			wantErr:   false,
+			podExists: true,
+		},
+		{
+			name: "Success: schedule a pod to a node with two unscheduled pods",
+			fields: fields{
+				Clientset: fake.NewSimpleClientset(unscheduledPod1, unscheduledPod2),
+				ScheduleLogic: &mockScheduleLogic{
+					funcChooseAvailableNodes: func(p *v1.Pod, nl *v1.NodeList) (*v1.NodeList, error) {
+						return &v1.NodeList{Items: []v1.Node{availableNode}}, nil
+					},
+					funcChooseSuitableNode: func(p *v1.Pod, nl *v1.NodeList) (v1.Node, error) {
+						return availableNode, nil
+					},
+				},
+			},
+			wantErr:   false,
+			podExists: true,
+		},
+		{
+			name: "Error: no available nodes",
+			fields: fields{
+				Clientset: fake.NewSimpleClientset(unscheduledPod1),
+				ScheduleLogic: &mockScheduleLogic{
+					funcChooseAvailableNodes: func(p *v1.Pod, nl *v1.NodeList) (*v1.NodeList, error) {
+						return nil, errors.New("no available nodes")
+					},
+				},
+			},
+			wantErr:       true,
+			podExists:     true,
+			expectedError: "no available nodes",
+		},
+		{
+			name: "Error: choosing suitable node fails",
+			fields: fields{
+				Clientset: fake.NewSimpleClientset(unscheduledPod1),
+				ScheduleLogic: &mockScheduleLogic{
+					funcChooseAvailableNodes: func(p *v1.Pod, nl *v1.NodeList) (*v1.NodeList, error) {
+						return &v1.NodeList{Items: []v1.Node{availableNode}}, nil
+					},
+					funcChooseSuitableNode: func(p *v1.Pod, nl *v1.NodeList) (v1.Node, error) {
+						return v1.Node{}, errors.New("suitable node selection failed")
+					},
+				},
+			},
+			wantErr:       true,
+			podExists:     true,
+			expectedError: "suitable node selection failed",
+		},
+		{
+			name: "Error: assigning pod to node fails",
+			fields: fields{
+				Clientset: func() *fake.Clientset {
+					clientset := fake.NewSimpleClientset(unscheduledPod1)
+					clientset.PrependReactor("create", "pods", func(action coretesting.Action) (handled bool, ret runtime.Object, err error) {
+						return true, nil, errors.New("assigning pod failed")
+					})
+					return clientset
+				}(),
+				ScheduleLogic: &mockScheduleLogic{
+					funcChooseAvailableNodes: func(p *v1.Pod, nl *v1.NodeList) (*v1.NodeList, error) {
+						return &v1.NodeList{Items: []v1.Node{availableNode}}, nil
+					},
+					funcChooseSuitableNode: func(p *v1.Pod, nl *v1.NodeList) (v1.Node, error) {
+						return availableNode, nil
+					},
+				},
+			},
+			wantErr:       true,
+			podExists:     true,
+			expectedError: "assigning pod failed",
+		},
+		{
+			name: "Success: No suitable node found",
+			fields: fields{
+				Clientset: fake.NewSimpleClientset(unscheduledPod1),
+				ScheduleLogic: &mockScheduleLogic{
+					funcChooseAvailableNodes: func(p *v1.Pod, nl *v1.NodeList) (*v1.NodeList, error) {
+						return &v1.NodeList{Items: []v1.Node{availableNode}}, nil
+					},
+					funcChooseSuitableNode: func(p *v1.Pod, nl *v1.NodeList) (v1.Node, error) {
+						return v1.Node{}, nil
+					},
+				},
+			},
+			wantErr:   false,
+			podExists: true,
+		},
+		{
+			name: "Success: No unscheduled pods",
+			fields: fields{
+				Clientset:     fake.NewSimpleClientset(),
+				ScheduleLogic: &mockScheduleLogic{},
+			},
+			wantErr:   false,
+			podExists: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			k := &K8sClient{
+				Clientset:     tt.fields.Clientset,
+				ScheduleLogic: tt.fields.ScheduleLogic,
+			}
+			if err := k.ProcessOneLoop(); (err != nil) != tt.wantErr {
+				t.Errorf("K8sClient.ProcessOneLoop() error = %v, wantErr %v", err, tt.wantErr)
+			}
+		})
+	}
+}
