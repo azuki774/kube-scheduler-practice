@@ -14,6 +14,7 @@ spec:
       labels:
         app: web-nginx
     spec:
+      schedulerName: my-custom-scheduler
       containers:
       - image: nginx
         name: nginx

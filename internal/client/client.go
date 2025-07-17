@@ -113,7 +113,6 @@ func (k *K8sClient) AssignPodToNode(pod *v1.Pod, node *v1.Node) error {
 		return fmt.Errorf("failed to bind pod %s/%s to node %s: %w", pod.Namespace, pod.Name, node.Name, err)
 	}
 
-	slog.Info("successfully bound pod to node", "pod", pod.Name, "node", node.Name)
 	return nil
 }
 
@@ -151,6 +150,8 @@ func (k *K8sClient) ProcessOneLoop() error {
 		if err := k.AssignPodToNode(&pod, &selectNode); err != nil {
 			return err
 		}
+
+		slog.Info("assign pod to node successfully", "pod", pod.Name, "node", selectNode.Name)
 	}
 	return nil
 }
