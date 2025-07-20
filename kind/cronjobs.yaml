@@ -1,0 +1,65 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cronjob-1
+spec:
+  schedule: "*/2 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          schedulerName: my-custom-scheduler
+          nodeSelector:
+            tier: cronjob
+          containers:
+          - name: busybox
+            image: busybox
+            command:
+            - /bin/sh
+            - -c
+            - sleep 20
+          restartPolicy: OnFailure
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cronjob-2
+spec:
+  schedule: "*/2 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          schedulerName: my-custom-scheduler
+          nodeSelector:
+            tier: cronjob
+          containers:
+          - name: busybox
+            image: busybox
+            command:
+            - /bin/sh
+            - -c
+            - sleep 20
+          restartPolicy: OnFailure
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: cronjob-3
+spec:
+  schedule: "*/2 * * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          schedulerName: my-custom-scheduler
+          nodeSelector:
+            tier: cronjob
+          containers:
+          - name: busybox
+            image: busybox
+            command:
+            - /bin/sh
+            - -c
+            - sleep 20
+          restartPolicy: OnFailure

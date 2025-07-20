@@ -20,9 +20,9 @@ func (s *ScheduleLogic) ChooseAvailableNodes(unschedulePod *v1.Pod, vs *v1.NodeL
 			continue
 		}
 
-		if unschedulePod.Kind != "CronJob" && vi.Labels["tier"] == "cronjob" {
+		if unschedulePod.Spec.NodeSelector["tier"] != "cronjob" && vi.Labels["tier"] == "cronjob" {
 			continue
-		} else if unschedulePod.Kind == "CronJob" && vi.Labels["tier"] != "cronjob" {
+		} else if unschedulePod.Spec.NodeSelector["tier"] == "cronjob" && vi.Labels["tier"] != "cronjob" {
 			continue
 		}
 
@@ -34,6 +34,10 @@ func (s *ScheduleLogic) ChooseAvailableNodes(unschedulePod *v1.Pod, vs *v1.NodeL
 
 // unscheduled podと配置していいnodesを与えると、配置するのに最適なnodeを返す
 func (s *ScheduleLogic) ChooseSuitableNode(unschedulePod *v1.Pod, vs *v1.NodeList) (v1.Node, error) {
+	if len(vs.Items) == 0 {
+		return v1.Node{}, nil
+	}
+
 	// vs.Items の要素からランダムで選択する
 	idx := rand.Intn(len(vs.Items))
 	return vs.Items[idx], nil

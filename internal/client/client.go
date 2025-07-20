@@ -135,6 +135,7 @@ func (k *K8sClient) ProcessOneLoop() error {
 		if err != nil {
 			return err
 		}
+
 		// 実際に配置するノードを取得
 		selectNode, err := k.ScheduleLogic.ChooseSuitableNode(&pod, availableNodes)
 		if err != nil {
